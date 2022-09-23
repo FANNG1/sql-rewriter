@@ -35,12 +35,10 @@ fn change_orderby(statement: &mut Statement) -> () {
         println!("{:?}", projects);
         let new_orderby = projects
             .into_iter()
-            .filter(|expr| {
-              match &expr {
+            .filter(|expr| match &expr {
                 Expr::Value(_) => false,
-                Expr::TypedString {..} => false ,
+                Expr::TypedString { .. } => false,
                 _ => true,
-              }
             })
             .map(|expr| OrderByExpr {
                 expr,
@@ -52,9 +50,12 @@ fn change_orderby(statement: &mut Statement) -> () {
     }
 }
 
-fn add_limit(statement: &mut Statement, limit : usize) {
+fn add_limit(statement: &mut Statement, limit: usize) {
     if let Statement::Query(q) = statement {
-      q.limit = Some(Expr::Value(sqlparser::ast::Value::Number(format!("{}", limit), false)))
+        q.limit = Some(Expr::Value(sqlparser::ast::Value::Number(
+            format!("{}", limit),
+            false,
+        )))
     }
 }
 
@@ -64,7 +65,7 @@ fn main() {
              WHERE a > b AND b < 100 \
              ORDER BY a DESC, b";
 
-    let dialect = HiveDialect{}; // or AnsiDialect, or your own dialect ...
+    let dialect = HiveDialect {}; // or AnsiDialect, or your own dialect ...
 
     let mut ast = Parser::parse_sql(&dialect, sql).unwrap();
 
