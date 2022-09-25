@@ -1,7 +1,7 @@
+use clap::Parser;
 use sqlparser::ast::{Expr, OrderByExpr, SelectItem, SetExpr, Statement};
 use sqlparser::dialect::HiveDialect;
-//use sqlparser::parser::Parser;
-use clap::Parser;
+use std::io;
 
 fn extract_expr_from_select_item(item: &SelectItem) -> Result<Expr, String> {
     match item {
@@ -70,27 +70,38 @@ struct Args {
 
     /// if add_limit gt a negtive value, will auto add limit xx to sql
     #[clap(long, value_parser, default_value_t = -1)]
-    add_limit: isize,
+    limit: isize,
+}
+
+fn get_sql() -> String {
+    let mut input = String::new();
+    let mut n = 1;
+    while n != 0 {
+        match io::stdin().read_line(&mut input) {
+            Ok(s) => {
+                n = s;
+            }
+            Err(error) => println!("error: {}", error),
+        }
+    }
+    input.trim().to_owned()
 }
 
 fn main() {
-    let sql = "SELECT a, b, 123, myfunc(b) \
-             FROM table_1 \
-             WHERE a > b AND b < 100 \
-             ORDER BY a DESC, b";
-
     let dialect = HiveDialect {}; // or AnsiDialect, or your own dialect ...
 
     let args = Args::parse();
+    let sql = get_sql();
+    //println!("{}",sql);
 
-    let mut ast = sqlparser::parser::Parser::parse_sql(&dialect, sql).unwrap();
+    let mut ast = sqlparser::parser::Parser::parse_sql(&dialect, &sql).unwrap();
 
     for s in ast.iter_mut() {
         if args.enable_orderby {
             change_orderby(s);
         }
-        if args.add_limit >= 0 {
-            add_limit(s, 1000);
+        if args.limit >= 0 {
+            add_limit(s, args.limit as usize);
         }
         println!("{}", s.to_string());
     }
