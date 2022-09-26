@@ -1,6 +1,6 @@
-use clap::{Parser,ValueEnum};
+use clap::{Parser, ValueEnum};
 use sqlparser::ast::{Expr, OrderByExpr, SelectItem, SetExpr, Statement};
-use sqlparser::dialect::{HiveDialect, MySqlDialect, AnsiDialect, Dialect};
+use sqlparser::dialect::{AnsiDialect, Dialect, HiveDialect, MySqlDialect};
 use std::io;
 
 fn extract_expr_from_select_item(item: &SelectItem) -> Result<Expr, String> {
@@ -33,7 +33,6 @@ fn change_orderby(statement: &mut Statement) -> () {
         q.order_by.clear();
 
         let projects = get_select_items(q.body.clone()).unwrap();
-        println!("{:?}", projects);
         let new_orderby = projects
             .into_iter()
             .filter(|expr| match &expr {
@@ -87,27 +86,19 @@ fn get_sql() -> String {
     let mut input = String::new();
     let mut n = 1;
     while n != 0 {
-        match io::stdin().read_line(&mut input) {
-            Ok(s) => {
-                n = s;
-            }
-            Err(error) => println!("error: {}", error),
-        }
+        n = io::stdin().read_line(&mut input).unwrap();
     }
     input.trim().to_owned()
 }
 
 fn main() {
-
     let args = Args::parse();
 
     let dialect: Box<dyn Dialect> = match &args.dialect {
-        Dialect2::Mysql =>  Box::new(MySqlDialect{}),
-        Dialect2::Hive =>  Box::new(HiveDialect{}),
-        Dialect2::Ansi =>  Box::new(AnsiDialect{}) ,
+        Dialect2::Mysql => Box::new(MySqlDialect {}),
+        Dialect2::Hive => Box::new(HiveDialect {}),
+        Dialect2::Ansi => Box::new(AnsiDialect {}),
     };
-
-    //let dialect = MySqlDialect{};
 
     let sql = get_sql();
 
