@@ -71,8 +71,13 @@ struct Args {
     #[clap(long, value_parser, default_value_t = -1)]
     limit: isize,
 
+    // use sepcial dialect
     #[clap(long, arg_enum, value_parser, default_value_t = Dialect2::Hive)]
     dialect: Dialect2,
+
+    /// print statement parse info
+    #[clap(long, value_parser, default_value_t = false)]
+    print_statement: bool,
 }
 
 #[derive(Debug, Copy, Clone, ValueEnum)]
@@ -102,15 +107,20 @@ fn main() {
 
     let sql = get_sql();
 
-    let mut ast = sqlparser::parser::Parser::parse_sql(&*dialect, &sql).unwrap();
+    let ast = sqlparser::parser::Parser::parse_sql(&*dialect, &sql).unwrap();
+    assert_eq!(ast.len(), 1);
+    let mut s = ast[0].clone();
 
-    for s in ast.iter_mut() {
-        if args.enable_orderby {
-            change_orderby(s);
-        }
-        if args.limit >= 0 {
-            add_limit(s, args.limit as usize);
-        }
-        println!("{}", s.to_string());
+    if args.print_statement {
+        println!("{:#?}", s);
+        return;
     }
+
+    if args.enable_orderby {
+        change_orderby(&mut s);
+    }
+    if args.limit >= 0 {
+        add_limit(&mut s, args.limit as usize);
+    }
+    println!("{}", s.to_string());
 }
