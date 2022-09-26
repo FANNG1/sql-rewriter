@@ -1,6 +1,6 @@
-use clap::Parser;
+use clap::{Parser,ValueEnum};
 use sqlparser::ast::{Expr, OrderByExpr, SelectItem, SetExpr, Statement};
-use sqlparser::dialect::HiveDialect;
+use sqlparser::dialect::{HiveDialect, MySqlDialect, AnsiDialect, Dialect};
 use std::io;
 
 fn extract_expr_from_select_item(item: &SelectItem) -> Result<Expr, String> {
@@ -71,6 +71,16 @@ struct Args {
     /// if add_limit gt a negtive value, will auto add limit xx to sql
     #[clap(long, value_parser, default_value_t = -1)]
     limit: isize,
+
+    #[clap(long, arg_enum, value_parser, default_value_t = Dialect2::Hive)]
+    dialect: Dialect2,
+}
+
+#[derive(Debug, Copy, Clone, ValueEnum)]
+enum Dialect2 {
+    Hive,
+    Mysql,
+    Ansi,
 }
 
 fn get_sql() -> String {
@@ -88,13 +98,20 @@ fn get_sql() -> String {
 }
 
 fn main() {
-    let dialect = HiveDialect {}; // or AnsiDialect, or your own dialect ...
 
     let args = Args::parse();
-    let sql = get_sql();
-    //println!("{}",sql);
 
-    let mut ast = sqlparser::parser::Parser::parse_sql(&dialect, &sql).unwrap();
+    let dialect: Box<dyn Dialect> = match &args.dialect {
+        Dialect2::Mysql =>  Box::new(MySqlDialect{}),
+        Dialect2::Hive =>  Box::new(HiveDialect{}),
+        Dialect2::Ansi =>  Box::new(AnsiDialect{}) ,
+    };
+
+    //let dialect = MySqlDialect{};
+
+    let sql = get_sql();
+
+    let mut ast = sqlparser::parser::Parser::parse_sql(&*dialect, &sql).unwrap();
 
     for s in ast.iter_mut() {
         if args.enable_orderby {
