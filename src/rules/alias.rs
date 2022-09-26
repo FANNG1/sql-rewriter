@@ -4,18 +4,17 @@ use super::Rule;
 
 #[derive(Default)]
 pub struct Alias {
-  id: usize,
+    id: usize,
 }
 
 impl Alias {
-
-    pub fn new(id: usize) ->Self {
-      Self { id }
+    pub fn new(id: usize) -> Self {
+        Self { id }
     }
     fn get_uniq_id(&mut self) -> usize {
-      let id = self.id;
-      self.id += 1;
-      id
+        let id = self.id;
+        self.id += 1;
+        id
     }
 
     fn get_new_ident(&mut self) -> Ident {

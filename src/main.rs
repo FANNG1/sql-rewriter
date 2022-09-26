@@ -3,7 +3,7 @@ use sqlparser::ast::Statement;
 use sqlparser::dialect::{AnsiDialect, Dialect, HiveDialect, MySqlDialect};
 use std::io;
 
-use crate::rules::{Limit, Orderby, Rule, Alias};
+use crate::rules::{Alias, Limit, Orderby, Rule};
 pub mod rules;
 
 /// Simple program to rewrite sql
@@ -81,7 +81,10 @@ fn main() {
         rules.push(Box::new(Limit::new(args.limit as usize)));
     }
 
-    rules.iter_mut().map(|rule| rule.apply(&mut query)).for_each(drop);
+    rules
+        .iter_mut()
+        .map(|rule| rule.apply(&mut query))
+        .for_each(drop);
 
     println!("{}", query.to_string());
 }
