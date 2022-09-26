@@ -1,5 +1,5 @@
 use clap::{Parser, ValueEnum};
-use sqlparser::ast::{Expr, OrderByExpr, SelectItem, SetExpr, Statement};
+use sqlparser::ast::{Expr, Ident, OrderByExpr, Query, SelectItem, SetExpr, Statement};
 use sqlparser::dialect::{AnsiDialect, Dialect, HiveDialect, MySqlDialect};
 use std::io;
 
@@ -28,35 +28,69 @@ fn get_select_items(body: Box<SetExpr>) -> Result<Vec<Expr>, String> {
     }
 }
 
-fn change_orderby(statement: &mut Statement) -> () {
-    if let Statement::Query(q) = statement {
-        q.order_by.clear();
-
-        let projects = get_select_items(q.body.clone()).unwrap();
-        let new_orderby = projects
-            .into_iter()
-            .filter(|expr| match &expr {
-                Expr::Value(_) => false,
-                Expr::TypedString { .. } => false,
-                _ => true,
-            })
-            .map(|expr| OrderByExpr {
-                expr,
-                asc: None,
-                nulls_first: None,
-            })
-            .collect::<Vec<_>>();
-        q.order_by = new_orderby;
-    }
+fn get_new_ident() -> Ident {
+    Ident::new(format!("sqlrewriter-{}", 0))
 }
 
-fn add_limit(statement: &mut Statement, limit: usize) {
-    if let Statement::Query(q) = statement {
-        q.limit = Some(Expr::Value(sqlparser::ast::Value::Number(
-            format!("{}", limit),
-            false,
-        )))
-    }
+fn add_alias_to_select_items(q: &mut Query) -> Result<(), String> {
+    //let mut body = *q.body.clone();
+    match *q.body {
+        SetExpr::Select(ref mut select) => {
+            let projection_with_alias = select
+                .projection
+                .iter()
+                .map(|item| match item {
+                    SelectItem::UnnamedExpr(expr) => match expr {
+                        Expr::Identifier(_) | Expr::CompoundIdentifier(_) | Expr::Value(_) => {
+                            SelectItem::UnnamedExpr(expr.clone())
+                        }
+                        _ => SelectItem::ExprWithAlias {
+                            expr: expr.clone(),
+                            alias: get_new_ident(),
+                        },
+                    },
+                    _ => item.clone(),
+                })
+                .collect::<Vec<_>>();
+            select.projection = projection_with_alias;
+        }
+        SetExpr::Query(ref mut query) => {
+            //let mut q = query.clone();
+            return add_alias_to_select_items(&mut *query);
+        }
+        _ => {
+            return Err("Not supported body".to_owned());
+        }
+    };
+
+    Ok(())
+}
+
+fn change_orderby(q: &mut Query) -> () {
+    q.order_by.clear();
+
+    let projects = get_select_items(q.body.clone()).unwrap();
+    let new_orderby = projects
+        .into_iter()
+        .filter(|expr| match &expr {
+            Expr::Value(_) => false,
+            Expr::TypedString { .. } => false,
+            _ => true,
+        })
+        .map(|expr| OrderByExpr {
+            expr,
+            asc: None,
+            nulls_first: None,
+        })
+        .collect::<Vec<_>>();
+    q.order_by = new_orderby;
+}
+
+fn add_limit(q: &mut Query, limit: usize) {
+    q.limit = Some(Expr::Value(sqlparser::ast::Value::Number(
+        format!("{}", limit),
+        false,
+    )))
 }
 
 /// Simple program to rewrite sql
@@ -109,18 +143,29 @@ fn main() {
 
     let ast = sqlparser::parser::Parser::parse_sql(&*dialect, &sql).unwrap();
     assert_eq!(ast.len(), 1);
-    let mut s = ast[0].clone();
+    let s = ast[0].clone();
 
     if args.print_statement {
         println!("{:#?}", s);
         return;
     }
 
+    let mut query = match s {
+        Statement::Query(query) => *query,
+        _ => {
+            println!("only support query");
+            return;
+        }
+    };
+
     if args.enable_orderby {
-        change_orderby(&mut s);
+        add_alias_to_select_items(&mut query).unwrap();
+        change_orderby(&mut query);
     }
     if args.limit >= 0 {
-        add_limit(&mut s, args.limit as usize);
+        add_limit(&mut query, args.limit as usize);
     }
-    println!("{}", s.to_string());
+
+    println!("{}", query.to_string());
+    //println!("{}", s.to_string());
 }
