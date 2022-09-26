@@ -1,5 +1,5 @@
 [package]
-name = "sqlparser-rewriter"
+name = "sql-rewriter"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 sqlparser = "0.23.0"
 clap = { version = "3.2.22", features = ["derive"] }
+

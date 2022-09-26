@@ -1,97 +1,10 @@
 use clap::{Parser, ValueEnum};
-use sqlparser::ast::{Expr, Ident, OrderByExpr, Query, SelectItem, SetExpr, Statement};
+use sqlparser::ast::Statement;
 use sqlparser::dialect::{AnsiDialect, Dialect, HiveDialect, MySqlDialect};
 use std::io;
 
-fn extract_expr_from_select_item(item: &SelectItem) -> Result<Expr, String> {
-    match item {
-        sqlparser::ast::SelectItem::UnnamedExpr(e) => Ok(e.clone()),
-        sqlparser::ast::SelectItem::ExprWithAlias { alias, .. } => {
-            Ok(Expr::Identifier(alias.clone()))
-        }
-        _ => Err("Not supported".to_owned()),
-    }
-}
-
-fn get_select_items(body: Box<SetExpr>) -> Result<Vec<Expr>, String> {
-    match *body {
-        SetExpr::Select(select) => {
-            let v = select
-                .projection
-                .iter()
-                .map(|item| extract_expr_from_select_item(item).unwrap())
-                .collect::<Vec<_>>();
-            Ok(v)
-        }
-        SetExpr::Query(query) => get_select_items(query.body.clone()),
-        _ => Err("Not supported body".to_owned()),
-    }
-}
-
-fn get_new_ident() -> Ident {
-    Ident::new(format!("sqlrewriter-{}", 0))
-}
-
-fn add_alias_to_select_items(q: &mut Query) -> Result<(), String> {
-    //let mut body = *q.body.clone();
-    match *q.body {
-        SetExpr::Select(ref mut select) => {
-            let projection_with_alias = select
-                .projection
-                .iter()
-                .map(|item| match item {
-                    SelectItem::UnnamedExpr(expr) => match expr {
-                        Expr::Identifier(_) | Expr::CompoundIdentifier(_) | Expr::Value(_) => {
-                            SelectItem::UnnamedExpr(expr.clone())
-                        }
-                        _ => SelectItem::ExprWithAlias {
-                            expr: expr.clone(),
-                            alias: get_new_ident(),
-                        },
-                    },
-                    _ => item.clone(),
-                })
-                .collect::<Vec<_>>();
-            select.projection = projection_with_alias;
-        }
-        SetExpr::Query(ref mut query) => {
-            //let mut q = query.clone();
-            return add_alias_to_select_items(&mut *query);
-        }
-        _ => {
-            return Err("Not supported body".to_owned());
-        }
-    };
-
-    Ok(())
-}
-
-fn change_orderby(q: &mut Query) -> () {
-    q.order_by.clear();
-
-    let projects = get_select_items(q.body.clone()).unwrap();
-    let new_orderby = projects
-        .into_iter()
-        .filter(|expr| match &expr {
-            Expr::Value(_) => false,
-            Expr::TypedString { .. } => false,
-            _ => true,
-        })
-        .map(|expr| OrderByExpr {
-            expr,
-            asc: None,
-            nulls_first: None,
-        })
-        .collect::<Vec<_>>();
-    q.order_by = new_orderby;
-}
-
-fn add_limit(q: &mut Query, limit: usize) {
-    q.limit = Some(Expr::Value(sqlparser::ast::Value::Number(
-        format!("{}", limit),
-        false,
-    )))
-}
+use crate::rules::{Limit, Orderby, Rule, Alias};
+pub mod rules;
 
 /// Simple program to rewrite sql
 #[derive(clap::Parser, Debug)]
@@ -158,14 +71,17 @@ fn main() {
         }
     };
 
+    let mut rules: Vec<Box<dyn Rule>> = vec![];
+
     if args.enable_orderby {
-        add_alias_to_select_items(&mut query).unwrap();
-        change_orderby(&mut query);
+        rules.push(Box::new(Alias::new(0)));
+        rules.push(Box::new(Orderby {}))
     }
     if args.limit >= 0 {
-        add_limit(&mut query, args.limit as usize);
+        rules.push(Box::new(Limit::new(args.limit as usize)));
     }
 
+    rules.iter_mut().map(|rule| rule.apply(&mut query)).for_each(drop);
+
     println!("{}", query.to_string());
-    //println!("{}", s.to_string());
 }
