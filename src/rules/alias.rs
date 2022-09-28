@@ -18,7 +18,7 @@ impl Alias {
     }
 
     fn get_new_ident(&mut self) -> Ident {
-        Ident::new(format!("sqlrewriter-{}", self.get_uniq_id()))
+        Ident::new(format!("sqlrewriter{}", self.get_uniq_id()))
     }
 
     fn add_alias_to_select_items(&mut self, q: &mut Query) -> Result<(), String> {
