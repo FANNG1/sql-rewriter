@@ -15,7 +15,7 @@ USAGE:
 
 OPTIONS:
         --dialect <DIALECT>    [default: hive] [possible values: hive, mysql, ansi]
-        --enable-orderby       extract orderby from select itmes and add to the sql
+        --orderby       extract orderby from select itmes and add to the sql
     -h, --help                 Print help information
         --limit <LIMIT>        if add_limit gt a negtive value, will auto add limit xx to sql
                                [default: -1]
@@ -24,7 +24,7 @@ OPTIONS:
 ```
 ### add order by
 ```
-echo "SELECT a, b, 123, myfunc(b) FROM table_1 WHERE a > b AND b < 100 ORDER BY a DESC, b" | ./target/debug/sqlparser-rewriter --enable-orderby
+echo "SELECT a, b, 123, myfunc(b) FROM table_1 WHERE a > b AND b < 100 ORDER BY a DESC, b" | ./target/debug/sqlparser-rewriter --orderby
 
 output:
 SELECT a, b, 123, myfunc(b) AS sqlrewriter-0 FROM table_1 WHERE a > b AND b < 100 ORDER BY a, b, sqlrewriter-0
@@ -38,6 +38,6 @@ SELECT a, b, 123, myfunc(b) FROM table_1 WHERE a > b AND b < 100 ORDER BY a DESC
 ```
 
 ## rules
-* orderby
-* Alias
-* limit
+* orderby, extract the project items and add to order by, internally use alias rules
+* Alias, add alias name to functions in project
+* limit, add limit to sql

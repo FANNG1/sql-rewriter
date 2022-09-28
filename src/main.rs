@@ -12,7 +12,7 @@ pub mod rules;
 struct Args {
     /// extract orderby from select itmes and add to the sql
     #[clap(long, value_parser, default_value_t = false)]
-    enable_orderby: bool,
+    orderby: bool,
 
     /// if add_limit gt a negtive value, will auto add limit xx to sql
     #[clap(long, value_parser, default_value_t = -1)]
@@ -73,7 +73,7 @@ fn main() {
 
     let mut rules: Vec<Box<dyn Rule>> = vec![];
 
-    if args.enable_orderby {
+    if args.orderby {
         rules.push(Box::new(Alias::new(0)));
         rules.push(Box::new(Orderby {}))
     }
